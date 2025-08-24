@@ -7,31 +7,31 @@ import torch
 from ultralytics import YOLO
 import os
 
-# 设定 IoU 阈值
+# Set IoU threshold
 IOU_THRESHOLD = 0.5
 
-# 训练好的 YOLOv8 模型路径
-model_paths = ["/media/robot/7846E2E046E29DDE/ultralytics/runs/detect/using_mspa_c2f_gd_modTaskAlignedAssigner/20250124final_result/weights/best.pt", #MGDT
-"/media/robot/7846E2E046E29DDE/ultralytics/runs/detect/origin_yolo_using_yolov8npt/train/weights/best.pt",#Baseline
-"/media/robot/7846E2E046E29DDE/ultralytics/runs/detect/using_mspa_c2f/train5/weights/best.pt",#M
-"/media/robot/7846E2E046E29DDE/paper_code_source/our_ultralytics/runs/detect/train2/weights/best.pt", #GD
-"/media/robot/7846E2E046E29DDE/paper_code_source/our_ultralytics/runs/detect/train4/weights/best.pt", #T
-"/media/robot/7846E2E046E29DDE/ultralytics/runs/detect/using_mspa_c2f_gd/train/weights/best.pt",#MGD
-"/media/robot/7846E2E046E29DDE/paper_code_source/our_ultralytics/runs/detect/train5/weights/best.pt",#MT
-"/media/robot/7846E2E046E29DDE/paper_code_source/our_ultralytics/runs/detect/train6/weights/best.pt",#GDT
-
-]  # 替换为你的模型
+# Trained YOLOv8 model paths
+model_paths = [
+    "/media/robot/7846E2E046E29DDE/ultralytics/runs/detect/using_mspa_c2f_gd_modTaskAlignedAssigner/20250124final_result/weights/best.pt", # MGDT
+    "/media/robot/7846E2E046E29DDE/ultralytics/runs/detect/origin_yolo_using_yolov8npt/train/weights/best.pt", # Baseline
+    "/media/robot/7846E2E046E29DDE/ultralytics/runs/detect/using_mspa_c2f/train5/weights/best.pt", # M
+    "/media/robot/7846E2E046E29DDE/paper_code_source/our_ultralytics/runs/detect/train2/weights/best.pt", # GD
+    "/media/robot/7846E2E046E29DDE/paper_code_source/our_ultralytics/runs/detect/train4/weights/best.pt", # T
+    "/media/robot/7846E2E046E29DDE/ultralytics/runs/detect/using_mspa_c2f_gd/train/weights/best.pt", # MGD
+    "/media/robot/7846E2E046E29DDE/paper_code_source/our_ultralytics/runs/detect/train5/weights/best.pt", # MT
+    "/media/robot/7846E2E046E29DDE/paper_code_source/our_ultralytics/runs/detect/train6/weights/best.pt", # GDT
+]
 models = [YOLO(model_path) for model_path in model_paths]
 
-# 设定数据集路径
-dataset_path = "/media/robot/7846E2E046E29DDE/piglet_pic_from_net/valid/"  # 替换为你的数据集根目录
+# Dataset path
+dataset_path = "/media/robot/7846E2E046E29DDE/piglet_pic_from_net/valid/"  # Replace with your dataset root path
 image_folder = os.path.join(dataset_path, "images")
 label_folder = os.path.join(dataset_path, "labels")
 
-# 读取测试集图片路径
+# Load test images
 test_images = glob.glob(os.path.join(image_folder, "*.jpg"))
 
-# 归一化 YOLOv8 标注格式转换为像素坐标
+# Convert YOLOv8 annotation format to pixel coordinates
 def yolo_to_bbox(x_center, y_center, width, height, img_width, img_height):
     x1 = int((x_center - width / 2) * img_width)
     y1 = int((y_center - height / 2) * img_height)
@@ -39,11 +39,11 @@ def yolo_to_bbox(x_center, y_center, width, height, img_width, img_height):
     y2 = int((y_center + height / 2) * img_height)
     return [x1, y1, x2, y2]
 
-# 读取 Ground Truth（GT），YOLO 格式：class_id x_center y_center width height
+# Load Ground Truth (GT), YOLO format: class_id x_center y_center width height
 def load_ground_truth(annotation_path, img_width, img_height):
     gt_boxes = []
     if not os.path.exists(annotation_path):
-        return gt_boxes  # 如果没有标注文件，则返回空列表
+        return gt_boxes  # Return empty if annotation file does not exist
     with open(annotation_path, "r") as f:
         for line in f.readlines():
             parts = line.strip().split()
@@ -53,7 +53,7 @@ def load_ground_truth(annotation_path, img_width, img_height):
             gt_boxes.append((*bbox, class_id))
     return gt_boxes
 
-# 计算 IoU
+# Compute IoU
 def compute_iou(box1, box2):
     x1, y1, x2, y2 = box1
     x1_gt, y1_gt, x2_gt, y2_gt = box2
@@ -68,11 +68,11 @@ def compute_iou(box1, box2):
     union = box1_area + box2_area - intersection
     return intersection / union if union > 0 else 0
 
-# 存储所有模型的 Precision 和 Recall
+# Store Precision and Recall of all models
 all_precisions = []
 all_recalls = []
 
-# 遍历每个模型进行预测
+# Iterate over each model for evaluation
 for model in models:
     y_true = []
     y_scores = []
@@ -80,19 +80,19 @@ for model in models:
     for img_path in test_images:
         img = cv2.imread(img_path)
         img_name = os.path.basename(img_path).replace(".jpg", ".txt")
-        annotation_path = os.path.join(label_folder, img_name)  # 获取对应的标注文件路径
+        annotation_path = os.path.join(label_folder, img_name)  # Annotation file path
         h, w, _ = img.shape
 
-        # 读取 Ground Truth
+        # Load GT
         gt_boxes = load_ground_truth(annotation_path, w, h)
         
-        # 进行预测
+        # Model inference
         results = model(img)
-        detections = results[0].boxes.data.cpu().numpy()  # 获取预测框
+        detections = results[0].boxes.data.cpu().numpy()  # Predicted boxes
         for det in detections:
             x_min, y_min, x_max, y_max, conf, class_id = det
             
-            # 计算 IoU 进行匹配
+            # IoU matching
             matched = False
             for gt_box in gt_boxes:
                 x_min_gt, y_min_gt, x_max_gt, y_max_gt, gt_class_id = gt_box
@@ -100,20 +100,20 @@ for model in models:
                     matched = True
                     break
             
-            y_true.append(1 if matched else 0)  # 1: 正确检测，0: 误检
-            y_scores.append(conf)  # 置信度作为预测分数
+            y_true.append(1 if matched else 0)  # 1: correct detection, 0: false positive
+            y_scores.append(conf)  # Confidence score
     
-    # 计算 Precision-Recall 曲线
+    # Compute Precision-Recall curve
     precision, recall, _ = precision_recall_curve(y_true, y_scores)
     all_precisions.append(precision)
     all_recalls.append(recall)
 
-# 计算所有模型的平均 P-R 曲线
-min_recall = max(map(lambda r: min(r), all_recalls))  # 统一最小 Recall 范围
+# Compute average P-R curve across models
+min_recall = max(map(lambda r: min(r), all_recalls))  # Align minimum recall range
 max_recall = 1.0
 recall_values = np.linspace(min_recall, max_recall, num=100)
 
-# 进行插值，使不同模型的 Recall 统一
+# Interpolation to align recall
 interpolated_precisions = []
 for precision, recall in zip(all_precisions, all_recalls):
     interpolated_precision = np.interp(recall_values, recall, precision)
@@ -121,31 +121,30 @@ for precision, recall in zip(all_precisions, all_recalls):
 
 mean_precision = np.mean(interpolated_precisions, axis=0)
 
-# 计算平均 AUC
+# Compute mean AUC
 average_auc = auc(recall_values, mean_precision)
 
-# 定义每条曲线的标签
+# Labels for each model
 labels = [
-    "YOLOv8n + MSPA C2f + GD + THead",  # 第一条曲线
-    "YOLOv8n",                         # 第二条曲线
-    "YOLOv8n + MSPA C2f",              # 第三条曲线
-    "YOLOv8n + GD",                    # 第四条曲线
-    "YOLOv8n + THead",                 # 第五条曲线
-    "YOLOv8n + MSPA C2f + GD",         # 第六条曲线
-    "YOLOv8n + MSPA C2f + THead",      # 第七条曲线
-    "YOLOv8n + GD + THead"             # 第八条曲线
+    "YOLOv8n + MSPA C2f + GD + THead",  # Model 1
+    "YOLOv8n",                         # Model 2
+    "YOLOv8n + MSPA C2f",              # Model 3
+    "YOLOv8n + GD",                    # Model 4
+    "YOLOv8n + THead",                 # Model 5
+    "YOLOv8n + MSPA C2f + GD",         # Model 6
+    "YOLOv8n + MSPA C2f + THead",      # Model 7
+    "YOLOv8n + GD + THead"             # Model 8
 ]
 
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
 
-
+# Plot P-R curves
 for i, (precision, recall) in enumerate(zip(all_precisions, all_recalls)):
-    if i < len(labels):  # 确保索引不会越界
+    if i < len(labels):
         if i == 0:
-            # 第一条曲线使用蓝色，更加显眼
+            # Highlight the first curve
             plt.plot(recall, precision, linestyle="-", color=colors[i], label=labels[i], alpha=1, linewidth=2)
         else:
-            # 其他曲线使用指定的颜色列表
             plt.plot(recall, precision, linestyle="-", color=colors[i], label=labels[i], alpha=1, linewidth=2)
 
 plt.xlabel('Recall')
@@ -154,48 +153,3 @@ plt.title('Precision-Recall curve of each model based on YOLOv8n')
 plt.legend()
 plt.grid()
 plt.show()
-
-
-
-"""
-# 绘制平均 P-R 曲线
-colors = plt.get_cmap("tab10").colors
-
-# 绘制 P-R 曲线
-plt.figure(figsize=(10, 7))
-
-for i, (precision, recall) in enumerate(zip(all_precisions, all_recalls)):
-    if i == 1:
-        # 突出显示第1条曲线（i == 1）
-        plt.plot(recall, precision, linestyle="-", color=colors[i % len(colors)], label=f'Model {i+1}', alpha=1, linewidth=3)  # 加粗且为实线
-    else:
-        plt.plot(recall, precision, linestyle="-", color=colors[i % len(colors)], label=f'Model {i+1}', alpha=1, linewidth=3)
-
-# 绘制平均 P-R 曲线（加粗）
-#plt.plot(recall_values, mean_precision, color="black", linewidth=2, label=f'Average P-R (AUC={average_auc:.3f})')
-
-plt.xlabel('Recall')
-plt.ylabel('Precision')
-plt.title('Precision-Recall curve of each model based on YOLOv8n')
-plt.legend()
-plt.grid()
-plt.show()
-"""
-
-
-
-'''
-for i, (precision, recall) in enumerate(zip(all_precisions, all_recalls)):
-    plt.plot(recall, precision, linestyle="--", color=colors[i % len(colors)], label=f'Model {i+1}', alpha=0.7)
-
-# 绘制平均 P-R 曲线（加粗）
-#plt.plot(recall_values, mean_precision, color="black", linewidth=2, label=f'Average P-R (AUC={average_auc:.3f})')
-
-plt.xlabel('Recall')
-plt.ylabel('Precision')
-plt.title('Precision-Recall curve of each model based on YOLOv8n')
-plt.legend()
-plt.grid()
-plt.show()
-'''
-
