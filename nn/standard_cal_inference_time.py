@@ -6,62 +6,62 @@ from PIL import Image
 from torchvision import transforms
 import os
 
-# 1. 初始化模型
-# 创建两个CUDA事件
+# 1. Initialize the model
+# Create two CUDA events
 start_event = torch.cuda.Event(enable_timing=True)
 end_event = torch.cuda.Event(enable_timing=True)
 
-# 加载模型
+# Load the model
 model = YOLO("/media/robot/7846E2E046E29DDE/paper_code_source/our_ultralytics/runs/detect/train6/weights/best.pt")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 将模型移动到GPU
+# Move the model to GPU
 model.to(device)
 
-# 定义输入图像文件夹路径
+# Define input image folder path
 input_folder = "/media/robot/7846E2E046E29DDE/piglet_pic_from_net/valid/images/"
 
-# 定义图像预处理
+# Define image preprocessing
 transform = transforms.Compose([
-    transforms.Resize((640, 640)),  # 修改为模型要求的尺寸
+    transforms.Resize((640, 640)),  # Resize to the size required by the model
     transforms.ToTensor(),
 ])
 
-# 遍历文件夹中的所有图片
+# Iterate over all images in the folder
 image_files = [f for f in os.listdir(input_folder) if f.endswith(('.jpg'))]
 
-# 初始化推理时间列表
+# Initialize list for inference times
 inference_times = []
 
 for image_file in image_files:
     input_path = os.path.join(input_folder, image_file)
     
-    # 加载并处理输入图像
-    image = Image.open(input_path)  # 打开图片
+    # Load and process input image
+    image = Image.open(input_path)  # Open the image
     image_tensor = transform(image).unsqueeze(0).to(device) 
 
-    # 开始记录时间
+    # Start timing
     start_event.record()
 
-    # 执行推理过程
+    # Perform inference
     with torch.no_grad():
-        output = model(image_tensor)  # 使用 predict 方法进行推理
+        output = model(image_tensor)  # Inference using the predict method
 
-    # 结束记录时间
+    # End timing
     end_event.record()
     torch.cuda.synchronize()
 
-    # 计算时间差
+    # Compute elapsed time
     inference_time = start_event.elapsed_time(end_event)
     inference_times.append(inference_time)
     
-    # 打印每张图片的推理时间
+    # Print inference time for each image
     print(f"Image: {image_file}, Inference Time: {inference_time:.2f} ms")
 
-# 去掉最高和最低值后计算平均推理时间
+# Compute average inference time excluding the max and min values
 if len(inference_times) > 2:
     inference_times.sort()
-    filtered_times = inference_times[1:-1]  # 去掉最高和最低值
+    filtered_times = inference_times[1:-1]  # Remove the highest and lowest values
     average_inference_time = sum(filtered_times) / len(filtered_times)
     print(f"Average Inference Time (excluding max and min): {average_inference_time:.2f} ms")
 elif len(inference_times) > 0:
@@ -69,6 +69,7 @@ elif len(inference_times) > 0:
     print(f"Average Inference Time: {average_inference_time:.2f} ms")
 else:
     print("No images found in the folder.")
+
 
 
 # import cv2
@@ -183,4 +184,5 @@ else:
 # torch.cuda.synchronize()
 
 # # 计算时间差
+
 # inference_time = start_event.elapsed_time(end_event)
